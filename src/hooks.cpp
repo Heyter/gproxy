@@ -8,13 +8,6 @@
 #include "memorytools.h"
 #include "stdlib.h"
 
-#define LUASHARED_CREATELUAINTERFACE 4
-#define LUAINTERFACE_REFERENCEPUSH 37
-
-extern std::map<int, std::string> MetaTableTypes;
-
-Color MainColor = Color(220, 20, 60, 255);
-
 
 extern Proxy proxy;
 
@@ -22,7 +15,7 @@ extern CLuaGamemode **g_pGamemode_ptr;
 #define g_pGamemode (*g_pGamemode_ptr)
 static VirtualReplacer<CLuaInterface> cl_luainterface_hooker;
 static VirtualReplacer<GarrysMod::Lua::ILuaShared> luashared_hooker;
-static int createluainterface_index, referencepush_index, runstringex_index, createmetatabletype_index, callinternal_index, callfunctionprotected_index;
+static int createluainterface_index, referencepush_index, runstringex_index, callinternal_index, callfunctionprotected_index;
 using namespace LFuncs;
 using namespace GarrysMod::Lua::Type;
 
@@ -108,6 +101,7 @@ namespace luajit_stuff {
 	extern GarrysMod::Lua::ILuaInterface *client_state;
 };
 
+
 class __HOOKS__ {
 public:
 	virtual void ReferencePush(unsigned int ref) {
@@ -138,10 +132,6 @@ public:
 		lua_pushto(((CLuaInterface *)this)->GetState(), proxy, GarrysMod::Lua::INDEX_GLOBAL);
 		lua_settable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
 
-		lua_pushlstring(proxy, "cl_r", 4);
-		lua_pushto(((CLuaInterface *)this)->GetState(), proxy, GarrysMod::Lua::INDEX_REGISTRY);
-		lua_settable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
-
 		// Merge non-existant functions to tables
 		lua_pushlstring(proxy, "cl_g", 4);
 		lua_gettable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
@@ -149,34 +139,9 @@ public:
 		table_merge(proxy, -1, -2);
 		lua_pop(proxy, 2);
 
-		lua_pushlstring(proxy, "cl_r", 4);
-		lua_gettable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
-
-		lua_pushnil(proxy);
-		while (lua_next(proxy, -2)) {
-			if (lua_type(proxy, -2) != STRING) {
-				lua_pop(proxy, 1);
-				continue;
-			}
-			lua_pushvalue(proxy, -2);
-			lua_gettable(proxy, GarrysMod::Lua::INDEX_REGISTRY);
-			if (lua_type(proxy, -1) == TABLE) {
-				table_merge(proxy, -1, -2);
-			} else {
-				lua_pushvalue(proxy, -3);
-				lua_pushvalue(proxy, -3);
-				lua_settable(proxy, GarrysMod::Lua::INDEX_REGISTRY);
-			}
-			lua_pop(proxy, 2);
-		}
-
-		lua_pop(proxy, 1);
+		proxy.RunString("use 'loaded.lua'", "Loaded");
 
 		return cl_luainterface_hooker.Call<bool>(runstringex_index, filename, path, stringToRun, run, printErrors, dontPushErrors, noReturns);
-	}
-	virtual void CreateMetaTableType(const char* strName, int iType) {
-		MetaTableTypes.insert(std::pair<int, std::string>(iType, strName));
-		cl_luainterface_hooker.Call<void>(createmetatabletype_index, strName, iType);
 	}
 	virtual CLuaInterface *CreateLuaInterface(unsigned char state, bool bsomething) {
 		auto ret = luashared_hooker.Call<CLuaInterface *>(createluainterface_index, state, bsomething);
@@ -186,14 +151,12 @@ public:
 			GarrysMod::Lua::ILuaBase *cl_luainterface_base = ret;
 			referencepush_index = GetVirtualIndex(cl_luainterface_base, &CLuaInterface::ReferencePush);
 			runstringex_index = GetVirtualIndex(ret, &CLuaInterface::RunStringEx);
-			createmetatabletype_index = GetVirtualIndex(cl_luainterface_base, &CLuaInterface::CreateMetaTableType);
 			callinternal_index = GetVirtualIndex(ret, &CLuaInterface::CallInternal);
 			callfunctionprotected_index = GetVirtualIndex(ret, &CLuaInterface::CallFunctionProtected);
 
 			new (&cl_luainterface_hooker) VirtualReplacer<CLuaInterface>(ret);
 			cl_luainterface_hooker.Hook(referencepush_index, GetVirtualAddress(hooks, &__HOOKS__::ReferencePush));
 			cl_luainterface_hooker.Hook(runstringex_index, GetVirtualAddress(hooks, &__HOOKS__::RunStringEx));
-			cl_luainterface_hooker.Hook(createmetatabletype_index, GetVirtualAddress(hooks, &__HOOKS__::CreateMetaTableType));
 			cl_luainterface_hooker.Hook(callinternal_index, GetVirtualAddress(hooks, &__HOOKS__::CallInternal));
 			cl_luainterface_hooker.Hook(callfunctionprotected_index, GetVirtualAddress(hooks, &__HOOKS__::CallFunctionProtected));
 

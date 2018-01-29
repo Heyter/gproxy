@@ -1,7 +1,18 @@
-#include "lua_extensions.h"
+#include "userdata.h"
+
 extern "C" {
 #include "lj_obj.h"
+#include "lauxlib.h"
 }
+
+
+struct ProxyLuaFunctionUserData {
+	GCfuncL *fn;
+};
+struct ProxyUserData {
+	GarrysMod::Lua::UserData ud;
+	GCudata *proxy_data;
+};
 
 lua_State *GetClientState();
 
@@ -99,12 +110,6 @@ static int ProxyFunction(lua_State *from) {
 	return call_function(from, to);
 }
 
-static int __gc_override(lua_State *L) {
-	auto ud = (ProxyUserData *)lua_touserdata(L, 1);
-	ud->proxy_data->unused2 = 0;
-	return 0;
-}
-
 static int ProxyLuaFunction (lua_State *from) {
 	lua_State *to = GetClientState();
 	auto ud = (ProxyLuaFunctionUserData *)lua_touserdata(from, lua_upvalueindex(1));
@@ -114,6 +119,83 @@ static int ProxyLuaFunction (lua_State *from) {
 	setfuncV(to, top, (GCfunc *)ud->fn);
 
 	return call_function(from, to);
+}
+
+static int metatable_index;
+
+static int __gc(lua_State *L) {
+	auto ud = (ProxyUserData *)lua_touserdata(L, 1);
+	ud->proxy_data->unused2 = 0;
+	return 0;
+}
+static int __index(lua_State *L) {
+	lua_State *cl = GetClientState();
+	LFuncs::lua_pushto(L, cl, 1);
+	LFuncs::lua_pushto(L, cl, 2);
+
+	lua_gettable(cl, -2);
+
+	LFuncs::lua_pushto(cl, L, -1);
+	lua_pop(cl, 2);
+	return 1;
+}
+static int __newindex(lua_State *L) {
+	lua_State *cl = GetClientState();
+	LFuncs::lua_pushto(L, cl, 1);
+	LFuncs::lua_pushto(L, cl, 2);
+	LFuncs::lua_pushto(L, cl, 3);
+
+	lua_settable(cl, -3);
+
+	lua_pop(cl, 1);
+	return 0;
+}
+static int __eq(lua_State *L) {
+	lua_State *cl = GetClientState();
+	LFuncs::lua_pushto(L, cl, 1);
+	LFuncs::lua_pushto(L, cl, 2);
+
+	lua_pushboolean(L, lua_equal(cl, -2, -1));
+
+	lua_pop(cl, 2);
+
+	return 1;
+}
+static int __tostring(lua_State *L) {
+	lua_State *cl = GetClientState();
+	LFuncs::lua_pushto(L, cl, 1);
+
+	if (luaL_callmeta(cl, -1, "__tostring")) {
+		size_t len;
+		const char *str = lua_tolstring(cl, -1, &len);
+		lua_pushlstring(L, str, len);
+		lua_pop(cl, 1);
+	}
+	else {
+		lua_pushfstring(L, "%s: %p", lua_typename(cl, lua_type(L, -1), lua_gettop(cl)), lua_topointer(cl, -1));
+	}
+	lua_pop(cl, 1);
+
+	return 1;
+}
+void InitMetaTable(lua_State *L) {
+	lua_newtable(L);
+	lua_pushstring(L, "__gc");
+	lua_pushcclosure(L, __gc, 0);
+	lua_settable(L, -3);
+	lua_pushstring(L, "__newindex");
+	lua_pushcclosure(L, __newindex, 0);
+	lua_settable(L, -3);
+	lua_pushstring(L, "__index");
+	lua_pushcclosure(L, __index, 0);
+	lua_settable(L, -3);
+	lua_pushstring(L, "__eq");
+	lua_pushcclosure(L, __eq, 0);
+	lua_settable(L, -3);
+	lua_pushstring(L, "__tostring");
+	lua_pushcclosure(L, __tostring, 0);
+	lua_settable(L, -3);
+	metatable_index = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 const char *GetMetaTableType(int type);
@@ -152,25 +234,9 @@ namespace LFuncs {
 
 				udgc->unused2 = 0xc9;
 
-				/* update metatable */
-				const char *type = GetMetaTableType(ud->ud.type);
-				/* todo: better entity method */
-				if (ud->ud.type == 9 /* GarrysMod::Lua::Types::ENTITY */ ) {
-					lua_getmetatable(from, stack);
-					lua_pushlstring(from, "MetaName", 8);
-					lua_rawget(from, -2);
-					if (lua_type(from, -1) == LUA_TSTRING) {
-						type = lua_tolstring(from, -1, 0);
-					}
-					lua_pop(from, 2);
-				}
-				lua_pushlstring(to, type, strlen(type));
-				lua_rawget(to, LUA_REGISTRYINDEX);
-				if (lua_type(to, -1) == LUA_TTABLE) {
-					lua_pushlstring(to, "__gc", 4);
-					lua_pushcclosure(to, __gc_override, 0);
-					lua_settable(to, -3);
-				}
+				/* metatable */
+
+				lua_rawgeti(to, LUA_REGISTRYINDEX, metatable_index);
 				lua_setmetatable(to, -2);
 			}
 			else if (luajit_stuff::proxy_state == from) {

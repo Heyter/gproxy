@@ -20,6 +20,11 @@ LUA_FUNCTIONS(definelfunc)
 
 extern void dohooks(void);
 
+static int (LUA_CONV RegisterHookCall)(lua_State *L) {
+	LFuncs::lua_rawseti(L, GarrysMod::Lua::INDEX_REGISTRY, proxy.hook_call_ref);
+	return 0;
+}
+
 void createproxy(void)
 {
 	// Get User's home path
@@ -58,7 +63,14 @@ void createproxy(void)
 	LFuncs::lua_pushlstring(proxy, "use", 3);
 	LFuncs::lua_pushcclosure(proxy, Luse, 0);
 	LFuncs::lua_settable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
+
+	LFuncs::lua_pushlstring(proxy, "RegisterHookCall", 16);
+	LFuncs::lua_pushcclosure(proxy, RegisterHookCall, 0);
+	LFuncs::lua_settable(proxy, GarrysMod::Lua::INDEX_GLOBAL);
+
 	proxy.GetGamemode();
+	extern void (LUA_CONV InitMetaTable)(lua_State *L);
+	InitMetaTable(proxy);
 	proxy.RunString("use 'init.lua'", "Init");
 }
 

@@ -74,6 +74,7 @@ namespace LFuncs
 	extern int (LUA_CONV *lua_gethookcount)(lua_State *L);
 	extern lua_Hook (LUA_CONV *lua_gethook)(lua_State *L);
 	extern void (LUA_CONV *lua_rawget)(lua_State *L, int index);
+	extern void (LUA_CONV *lua_rawseti)(lua_State *L, int index, int n);
 
 	inline void lua_pop(lua_State *L, int amount)
 	{
