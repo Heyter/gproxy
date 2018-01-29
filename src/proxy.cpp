@@ -62,6 +62,10 @@ void createproxy(void)
 	proxy.RunString("use 'init.lua'", "Init");
 }
 
+namespace luajit_stuff {
+	extern lua_State *proxy_state;
+};
+
 lua_State *Proxy::GetState(void)
 {
 	if (!this->_interface) {
@@ -79,6 +83,7 @@ lua_State *Proxy::GetState(void)
 		
 		this->hook_call_ref = LFuncs::luaL_ref(L, GarrysMod::Lua::INDEX_REGISTRY);
 		LFuncs::lua_pop(L, 1);
+		luajit_stuff::proxy_state = L;
 	}
 	return this->_interface->GetState();
 }

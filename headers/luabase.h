@@ -12,14 +12,6 @@ class Vector;
 
 struct lua_State;
 
-extern "C"
-{
-	extern void(*lua_getfenv)(lua_State *L, int idx);
-	extern int(*lua_setfenv)(lua_State *L, int idx);
-	extern const char *(*lua_pushvfstring)(lua_State *L, const char *fmt, va_list argp);
-	extern int(*lua_error)(lua_State *L);
-	extern int(*luaL_typerror)(lua_State *L, int narg, const char *tname);
-}
 
 namespace GarrysMod
 {
@@ -295,55 +287,6 @@ namespace GarrysMod
 				return state;
 			}
 
-			// Gets the environment table of the value at the given index
-			inline void GetFEnv(int iStackPos)
-			{
-				lua_getfenv(state, iStackPos);
-			}
-
-			// Sets the environment table of the value at the given index
-			inline int SetFEnv(int iStackPos)
-			{
-				return lua_setfenv(state, iStackPos);
-			}
-
-			// Pushes a formatted string onto the stack
-			inline const char *PushFormattedString(const char *fmt, va_list args)
-			{
-				return lua_pushvfstring(state, fmt, args);
-			}
-
-			// Pushes a formatted string onto the stack
-			inline const char *PushFormattedString(const char *fmt, ...)
-			{
-				va_list args;
-				va_start(args, fmt);
-				const char *res = PushFormattedString(fmt, args);
-				va_end(args);
-				return res;
-			}
-
-			// Throws an error (uses the value at the top of the stack)
-			inline int Error()
-			{
-				return lua_error(state);
-			}
-
-			// Throws an error (pushes a formatted string onto the stack and uses it)
-			inline int FormattedError(const char *fmt, ...)
-			{
-				va_list args;
-				va_start(args, fmt);
-				PushFormattedString(fmt, args);
-				va_end(args);
-				return Error();
-			}
-
-			// Throws an error related to type differences
-			inline int TypeError(int iStackPos, const char *tname)
-			{
-				return luaL_typerror(state, iStackPos, tname);
-			}
 
 		private:
 			lua_State * state;

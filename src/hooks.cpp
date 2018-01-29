@@ -11,7 +11,7 @@
 #define LUASHARED_CREATELUAINTERFACE 4
 #define LUAINTERFACE_REFERENCEPUSH 37
 
-std::map<int, std::string> MetaTableTypes;
+extern std::map<int, std::string> MetaTableTypes;
 
 Color MainColor = Color(220, 20, 60, 255);
 
@@ -80,22 +80,33 @@ static void fixup_call(lua_State *L, int iArgs) {
 static void *gc_sweep_proceed; // (addr + 6)
 static void *gc_sweep_override; // (addr + 13)
 
+union GCobj;
+extern bool __cdecl ShouldOverrideGC(const GCobj * const obj);
+
 static void __declspec(naked) gc_sweep_preventgc() {
 	__asm {
-		mov al, [esi + 7]
-		cmp al, 0c9h
-		je sweep_override
+		push esi
+		call ShouldOverrideGC
+		pop esi
+		test al, al
+		jz sweep_proceed
+		jmp sweep_override
 
 	sweep_proceed:
 		mov cl, [esi + 4]
 		movzx eax, cl
 		mov ecx, gc_sweep_proceed
 		jmp ecx
+
 	sweep_override:
 		mov eax, gc_sweep_override
 		jmp eax
 	}
 }
+
+namespace luajit_stuff {
+	extern GarrysMod::Lua::ILuaInterface *client_state;
+};
 
 class __HOOKS__ {
 public:
@@ -185,6 +196,8 @@ public:
 			cl_luainterface_hooker.Hook(createmetatabletype_index, GetVirtualAddress(hooks, &__HOOKS__::CreateMetaTableType));
 			cl_luainterface_hooker.Hook(callinternal_index, GetVirtualAddress(hooks, &__HOOKS__::CallInternal));
 			cl_luainterface_hooker.Hook(callfunctionprotected_index, GetVirtualAddress(hooks, &__HOOKS__::CallFunctionProtected));
+
+			luajit_stuff::client_state = ret;
 		}
 		return ret;
 	}

@@ -24,7 +24,7 @@ namespace LFuncs
 	typedef void(LUA_CONV *lua_Hook) (lua_State *L, lua_Debug *ar);
 	typedef int (LUA_CONV *lua_CFunction)(lua_State *);
 	typedef double lua_Number;
-	extern int lua_pushto(lua_State *from, lua_State *to, int stack, bool first = true);
+	extern int (LUA_CONV lua_pushto)(lua_State *from, lua_State *to, int stack, bool first = true);
 	extern int (LUA_CONV *lua_pcall)(lua_State *L, int nargs, int nresults, int errfunc);
 	inline int lua_upvalueindex(int index)
 	{

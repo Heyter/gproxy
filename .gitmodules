@@ -1,0 +1,3 @@
+[submodule "gluajit"]
+	path = gluajit
+	url = https://github.com/meepdarknessmeep/gluajit.git
